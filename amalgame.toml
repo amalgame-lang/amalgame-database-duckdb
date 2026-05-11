@@ -1,0 +1,59 @@
+# Package manifest — amc reads this at `amc package add` time to
+# learn what symbols this package contributes + how to compile
+# against them. See docs/proposals/amalgame-package-manager.md in
+# amalgame-lang/Amalgame for the full spec.
+#
+# DuckDB (https://duckdb.org) is an embedded analytical (OLAP)
+# database — think "SQLite for analytics". This binding vendors
+# the official C++ amalgamation (MIT licence) so user projects
+# pull DuckDB in with a single `amc package add duckdb@vX.Y.Z`,
+# no `libduckdb-dev` install needed.
+
+[package]
+name              = "amalgame-database-duckdb"
+version           = "0.1.0"
+license           = "Apache-2.0"
+description       = "DuckDB binding for Amalgame — vendored C++ amalgamation, manifest-driven dispatch."
+authors           = ["Bastien Mouget"]
+required-amalgame = ">=0.5.3"
+schema-version    = 1
+
+[stdlib]
+class     = "DuckDB"
+header    = "runtime/Amalgame_Database_DuckDB.h"
+namespace = "Amalgame.Database.DuckDB"
+
+# Vendored C++ amalgamation. amc compiles this with g++ (extension
+# .cpp triggers the C++ path in Program.PreCompilePackageSources)
+# and links it into every user binary that imports the package.
+# Precompiled once to /tmp/amc-pkg-DuckDB-duckdb.cpp.o per test run.
+sources  = ["runtime/Amalgame_Database/duckdb/duckdb.cpp"]
+
+# DuckDB requires C++17. NDEBUG strips internal asserts.
+# -O2 is a deliberate compromise: -O3 on the 25 MB amalgamation
+# routinely needs 15+ GB RAM and 30+ min, which makes the first
+# `amc test` after install painful. -O2 cuts both ~30% with
+# minimal runtime cost on typical OLAP queries (DuckDB's vectorised
+# kernels are hand-tuned, so -O3's extra inlining gains little).
+# Users who want absolute peak performance can recompile manually
+# with -O3; the .o is cached in /tmp/amc-pkg-DuckDB-duckdb.cpp.o.
+cxxflags = "-O2 -DNDEBUG -std=c++17 -Wno-unused-parameter -Wno-unused-variable -Wno-deprecated-declarations"
+
+# Final-link libs — DuckDB needs libstdc++ for its C++ runtime
+# (g++ usually adds this implicitly, but declaring it here keeps
+# the manifest self-describing for tooling that introspects it).
+libs     = ["stdc++"]
+
+# Surface the amc cgen needs to know about. `returns` is the
+# C-level type (with `*` for pointer types); amc strips the `*`
+# when declaring the Amalgame-side type to the resolver.
+[stdlib.functions]
+Open       = { returns = "AmalgameDuckDB*" }
+Close      = { returns = "void" }
+IsOpen     = { returns = "code_bool" }
+LastError  = { returns = "code_string" }
+Exec       = { returns = "code_bool" }
+QueryAll   = { returns = "AmalgameList*" }
+
+[dependencies]
+# none — DuckDB is a leaf in the dep graph

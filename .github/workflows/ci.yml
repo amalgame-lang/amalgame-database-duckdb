@@ -19,7 +19,10 @@ jobs:
         # package's `required-amalgame = ">=0.5.3"` constraint.
         # Add more tags here as new amc releases ship — older
         # ones are kept as a regression net.
-        amc-tag: [v0.5.3]
+        # v0.5.4 introduced `[stdlib].precompile = true` which v0.1.1
+        # opts into. Older amc versions still install the package
+        # via the lazy /tmp cache path — they just ignore the field.
+        amc-tag: [v0.5.4, v0.5.3]
     steps:
       - name: Checkout package
         uses: actions/checkout@v4

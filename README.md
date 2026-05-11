@@ -7,7 +7,7 @@ needed.
 
 ## Requirements
 
-- amc **>= 0.5.3** (C++ source support in the package manager)
+- amc **>= 0.5.4** (precompile-on-install + C++ source support)
 - A C++17-capable g++ (any g++ ≥ 8 will do)
 - ~30–60 seconds the first time you build a project that uses
   it — DuckDB's amalgamation is ~25 MB of C++.
@@ -15,10 +15,18 @@ needed.
 ## Install
 
 ```bash
-amc package add github.com/amalgame-lang/amalgame-database-duckdb@v0.1.0
+amc package add github.com/amalgame-lang/amalgame-database-duckdb@v0.1.1
 # or via the curated index:
-amc package add duckdb@v0.1.0
+amc package add duckdb@v0.1.1
 ```
+
+Since v0.1.1 the package opts into **precompile-on-install** (amc
+v0.5.4+): the 5-minute g++ pass runs once during `amc package add`,
+the resulting `.o` lives at
+`~/.amalgame/packages/.../build/<platform>/DuckDB-duckdb.cpp.o`,
+and every subsequent `amc test` / `amc build` reuses it instantly.
+Skip it with `--no-precompile` if you just want to install without
+paying the compile cost upfront.
 
 ## Use
 

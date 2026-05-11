@@ -11,11 +11,11 @@
 
 [package]
 name              = "amalgame-database-duckdb"
-version           = "0.1.0"
+version           = "0.1.1"
 license           = "Apache-2.0"
 description       = "DuckDB binding for Amalgame — vendored C++ amalgamation, manifest-driven dispatch."
 authors           = ["Bastien Mouget"]
-required-amalgame = ">=0.5.3"
+required-amalgame = ">=0.5.4"
 schema-version    = 1
 
 [stdlib]
@@ -26,8 +26,14 @@ namespace = "Amalgame.Database.DuckDB"
 # Vendored C++ amalgamation. amc compiles this with g++ (extension
 # .cpp triggers the C++ path in Program.PreCompilePackageSources)
 # and links it into every user binary that imports the package.
-# Precompiled once to /tmp/amc-pkg-DuckDB-duckdb.cpp.o per test run.
 sources  = ["runtime/Amalgame_Database/duckdb/duckdb.cpp"]
+
+# Precompile at install time (amc >= 0.5.4): the 5-minute g++ pass
+# runs once during `amc package add duckdb@vX.Y.Z`, output cached
+# at `~/.amalgame/packages/.../build/<platform>/DuckDB-duckdb.cpp.o`.
+# Subsequent `amc test` / `amc build` reuse the .o instantly.
+# Override with `amc package add duckdb@vX.Y.Z --no-precompile`.
+precompile = true
 
 # DuckDB requires C++17. NDEBUG strips internal asserts.
 # -O2 is a deliberate compromise: -O3 on the 25 MB amalgamation

@@ -1,0 +1,139 @@
+// Stdlib test: Amalgame.Database.DuckDB — embedded analytical DB
+// via the vendored C++ amalgamation. Uses ":memory:" (passed as
+// an empty string) so the suite stays parallel-safe + leaves
+// nothing on disk.
+
+namespace Tests
+
+import Amalgame.Collections
+import Amalgame.Database.DuckDB
+
+public class Program {
+    public static void Main(string[] args) {
+
+        // ── Open + close ──────────────────────────────────
+
+        let db = DuckDB.Open("")
+        if (DuckDB.IsOpen(db)) {
+            Console.WriteLine("[PASS] open memory")
+        } else {
+            Console.WriteLine("[FAIL] open memory got " + DuckDB.LastError(db))
+        }
+
+        // ── DDL + DML ─────────────────────────────────────
+
+        let createOk: bool = DuckDB.Exec(db, "CREATE TABLE users (id INTEGER, name VARCHAR, age INTEGER)")
+        if (createOk) {
+            Console.WriteLine("[PASS] create table")
+        } else {
+            Console.WriteLine("[FAIL] create table: " + DuckDB.LastError(db))
+        }
+
+        let insertOk: bool = DuckDB.Exec(db, "INSERT INTO users VALUES (1, 'Alice', 30), (2, 'Bob', 25), (3, 'Charlie', 40)")
+        if (insertOk) {
+            Console.WriteLine("[PASS] insert batch")
+        } else {
+            Console.WriteLine("[FAIL] insert batch: " + DuckDB.LastError(db))
+        }
+
+        // ── Query: row count ───────────────────────────────
+
+        // Outer list has no type annotation because the parser
+        // rejects nested generics in `let` bindings — the cgen
+        // infers AmalgameList* from QueryAll's manifest entry.
+        let rows = DuckDB.QueryAll(db, "SELECT id, name, age FROM users ORDER BY id")
+        let rowCount: int = rows.Count()
+        if (rowCount == 3) {
+            Console.WriteLine("[PASS] query 3 rows")
+        } else {
+            Console.WriteLine("[FAIL] query got " + String_FromInt(rowCount) + " rows")
+        }
+
+        // ── Query: column values as text ───────────────────
+
+        let alice_row: List<string> = rows.Get(0)
+        let alice_name: string = alice_row.Get(1)
+        if (alice_name == "Alice") {
+            Console.WriteLine("[PASS] alice name")
+        } else {
+            Console.WriteLine("[FAIL] alice name got " + alice_name)
+        }
+
+        let alice_age: string = alice_row.Get(2)
+        if (alice_age == "30") {
+            Console.WriteLine("[PASS] alice age")
+        } else {
+            Console.WriteLine("[FAIL] alice age got " + alice_age)
+        }
+
+        // ── Aggregate (offline-safe variant) ───────────────
+        // COUNT(*) is parsed by DuckDB's core grammar — it doesn't
+        // live in `core_functions` like SUM / AVG do. So this test
+        // works against the bare vendored amalgamation without any
+        // network access. Production code that wants SUM / AVG /
+        // STDDEV gets it via auto-install (`Open` enables the
+        // `autoinstall_known_extensions` setting), which downloads
+        // on first use from extensions.duckdb.org.
+
+        let countRows = DuckDB.QueryAll(db, "SELECT COUNT(*) FROM users")
+        let countRow: List<string> = countRows.Get(0)
+        let countStr: string = countRow.Get(0)
+        if (countStr == "3") {
+            Console.WriteLine("[PASS] aggregate count")
+        } else {
+            Console.WriteLine("[FAIL] aggregate count got '" + countStr + "'")
+        }
+
+        // ── UPDATE + SELECT reflect ────────────────────────
+
+        let updateOk: bool = DuckDB.Exec(db, "UPDATE users SET age = age + 1 WHERE name != 'Charlie'")
+        if (updateOk) {
+            Console.WriteLine("[PASS] update")
+        } else {
+            Console.WriteLine("[FAIL] update: " + DuckDB.LastError(db))
+        }
+
+        let aliceAgain = DuckDB.QueryAll(db, "SELECT age FROM users WHERE name = 'Alice'")
+        let aliceAgeRow: List<string> = aliceAgain.Get(0)
+        if (aliceAgeRow.Get(0) == "31") {
+            Console.WriteLine("[PASS] alice age post-update")
+        } else {
+            Console.WriteLine("[FAIL] alice age got " + aliceAgeRow.Get(0))
+        }
+
+        // ── Error path: invalid SQL ────────────────────────
+
+        let badOk: bool = DuckDB.Exec(db, "INSERT INTO nonexistent_table VALUES (1)")
+        if (!badOk) {
+            let err: string = DuckDB.LastError(db)
+            if (String_Contains(err, "nonexistent_table") || String_Contains(err, "does not exist")) {
+                Console.WriteLine("[PASS] error reported")
+            } else {
+                Console.WriteLine("[FAIL] error msg got: " + err)
+            }
+        } else {
+            Console.WriteLine("[FAIL] error should have flagged")
+        }
+
+        // ── DELETE + verify ────────────────────────────────
+
+        DuckDB.Exec(db, "DELETE FROM users WHERE name = 'Bob'")
+        let afterDelete = DuckDB.QueryAll(db, "SELECT COUNT(*) FROM users")
+        let afterRow: List<string> = afterDelete.Get(0)
+        let leftStr: string = afterRow.Get(0)
+        if (leftStr == "2") {
+            Console.WriteLine("[PASS] delete leaves 2")
+        } else {
+            Console.WriteLine("[FAIL] delete count got " + leftStr)
+        }
+
+        // ── Close ─────────────────────────────────────────
+
+        DuckDB.Close(db)
+        if (!DuckDB.IsOpen(db)) {
+            Console.WriteLine("[PASS] closed")
+        } else {
+            Console.WriteLine("[FAIL] still open after close")
+        }
+    }
+}

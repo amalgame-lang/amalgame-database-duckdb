@@ -1,0 +1,8 @@
+# Keep the vendored DuckDB amalgamation out of GitHub's language
+# stats — without this the repo shows up as ~99% C++ because of
+# 25 MB of upstream duckdb.cpp. With this annotation, the
+# language bar reflects only the Amalgame-binding code we wrote.
+runtime/Amalgame_Database/duckdb/duckdb.cpp linguist-vendored=true
+runtime/Amalgame_Database/duckdb/duckdb.hpp linguist-vendored=true
+runtime/Amalgame_Database/duckdb/duckdb.h   linguist-vendored=true
+runtime/Amalgame_Database/duckdb/duckdb_extension.h linguist-vendored=true

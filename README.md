@@ -5,12 +5,30 @@ Embedded analytical (OLAP) database — think "SQLite for analytics".
 Vendored C++ amalgamation, MIT-licensed, no external `libduckdb-dev`
 needed.
 
-## Requirements
+## Prerequisites
 
-- amc **>= 0.5.4** (precompile-on-install + C++ source support)
-- A C++17-capable g++ (any g++ ≥ 8 will do)
-- ~30–60 seconds the first time you build a project that uses
-  it — DuckDB's amalgamation is ~25 MB of C++.
+| Requirement | Detail |
+|---|---|
+| amc | **>= 0.5.4** (precompile-on-install + C++ source support) |
+| C++17 compiler | g++ ≥ 8 / clang++ ≥ 7 |
+| Initial compile time | ~30–60 s once per platform — DuckDB's amalgamation is ~25 MB of C++; subsequent builds reuse the precompiled `.o` |
+
+A C++17-capable compiler is the only system dep — DuckDB itself
+is vendored. Most desktop OSes ship one out of the box; on a
+minimal install:
+
+| OS / distro | Command |
+|---|---|
+| Debian / Ubuntu | `sudo apt install g++` (or `build-essential`) |
+| Fedora / RHEL | `sudo dnf install gcc-c++` |
+| Arch / Manjaro | `sudo pacman -S gcc` (g++ ships with gcc) |
+| Alpine | `apk add g++` |
+| macOS | `xcode-select --install` (provides clang++) |
+| Windows (MSYS2) | `pacman -S mingw-w64-x86_64-gcc` |
+
+Runtime: no extra package — the precompiled `.o` is linked
+statically into your binary alongside `libstdc++` (already on
+every glibc-based system).
 
 ## Install
 

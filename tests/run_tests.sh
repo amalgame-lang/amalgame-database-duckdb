@@ -171,7 +171,7 @@ run_test() {
         FAIL=$((FAIL + 1)); return
     fi
     g++ -O2 "$out_base.o" "$DUCKDB_OBJ" \
-        -lgc -lm -lcurl -ldl -lpthread -o "$out_base" 2>/dev/null
+        -lgc -lm -ldl -lpthread -o "$out_base" 2>/dev/null
     if [ ! -x "$out_base" ]; then
         echo -e "${RED}FAIL${NC} (g++ link failed)"
         FAIL=$((FAIL + 1)); return

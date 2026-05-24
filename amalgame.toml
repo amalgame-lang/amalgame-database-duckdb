@@ -11,11 +11,11 @@
 
 [package]
 name              = "amalgame-database-duckdb"
-version           = "0.1.1"
+version           = "0.2.0"
 license           = "Apache-2.0"
-description       = "DuckDB binding for Amalgame — vendored C++ amalgamation, manifest-driven dispatch."
+description       = "DuckDB binding for Amalgame — vendored C++ amalgamation, manifest-driven dispatch. QueryAll returns typed List<List<string>>."
 authors           = ["Bastien Mouget"]
-required-amalgame = ">=0.5.4"
+required-amalgame = ">=0.8.40"
 schema-version    = 1
 
 [stdlib]
@@ -59,7 +59,9 @@ Close      = { returns = "void" }
 IsOpen     = { returns = "code_bool" }
 LastError  = { returns = "code_string" }
 Exec       = { returns = "code_bool" }
-QueryAll   = { returns = "AmalgameList*" }
+# `returns_generic` (amc 0.8.40+) lets `let row = rows.Get(i)` infer
+# to `List<string>` and `row.Get(j)` to `string` — no annotations.
+QueryAll   = { returns = "AmalgameList*", returns_generic = "List<List<string>>" }
 
 [dependencies]
 # none — DuckDB is a leaf in the dep graph

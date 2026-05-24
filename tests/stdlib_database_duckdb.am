@@ -51,15 +51,15 @@ public class Program {
 
         // ── Query: column values as text ───────────────────
 
-        let alice_row: List<string> = rows.Get(0)
-        let alice_name: string = alice_row.Get(1)
+        let alice_row = rows.Get(0)
+        let alice_name = alice_row.Get(1)
         if (alice_name == "Alice") {
             Console.WriteLine("[PASS] alice name")
         } else {
             Console.WriteLine("[FAIL] alice name got " + alice_name)
         }
 
-        let alice_age: string = alice_row.Get(2)
+        let alice_age = alice_row.Get(2)
         if (alice_age == "30") {
             Console.WriteLine("[PASS] alice age")
         } else {
@@ -76,8 +76,8 @@ public class Program {
         // on first use from extensions.duckdb.org.
 
         let countRows = DuckDB.QueryAll(db, "SELECT COUNT(*) FROM users")
-        let countRow: List<string> = countRows.Get(0)
-        let countStr: string = countRow.Get(0)
+        let countRow = countRows.Get(0)
+        let countStr = countRow.Get(0)
         if (countStr == "3") {
             Console.WriteLine("[PASS] aggregate count")
         } else {
@@ -94,7 +94,7 @@ public class Program {
         }
 
         let aliceAgain = DuckDB.QueryAll(db, "SELECT age FROM users WHERE name = 'Alice'")
-        let aliceAgeRow: List<string> = aliceAgain.Get(0)
+        let aliceAgeRow = aliceAgain.Get(0)
         if (aliceAgeRow.Get(0) == "31") {
             Console.WriteLine("[PASS] alice age post-update")
         } else {
@@ -119,8 +119,8 @@ public class Program {
 
         DuckDB.Exec(db, "DELETE FROM users WHERE name = 'Bob'")
         let afterDelete = DuckDB.QueryAll(db, "SELECT COUNT(*) FROM users")
-        let afterRow: List<string> = afterDelete.Get(0)
-        let leftStr: string = afterRow.Get(0)
+        let afterRow = afterDelete.Get(0)
+        let leftStr = afterRow.Get(0)
         if (leftStr == "2") {
             Console.WriteLine("[PASS] delete leaves 2")
         } else {

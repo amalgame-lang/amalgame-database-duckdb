@@ -33,9 +33,9 @@ every glibc-based system).
 ## Install
 
 ```bash
-amc package add github.com/amalgame-lang/amalgame-database-duckdb@v0.1.1
+amc package add github.com/amalgame-lang/amalgame-database-duckdb@v0.2.0
 # or via the curated index:
-amc package add duckdb@v0.1.1
+amc package add duckdb@v0.2.0
 ```
 
 Since v0.1.1 the package opts into **precompile-on-install** (amc

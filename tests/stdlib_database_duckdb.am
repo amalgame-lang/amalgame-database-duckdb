@@ -127,6 +127,101 @@ public class Program {
             Console.WriteLine("[FAIL] delete count got " + leftStr)
         }
 
+        // ── v0.3: parameter binding (ExecBind / QueryBindAll) ─
+
+        let bindParams: List<string> = new List<string>()
+        bindParams.Add("4")
+        bindParams.Add("Dave; DROP TABLE users; --")
+        bindParams.Add("55")
+        let bindOk: bool = DuckDB.ExecBind(db,
+            "INSERT INTO users VALUES (?, ?, ?)", bindParams)
+        if (bindOk) {
+            Console.WriteLine("[PASS] execbind insert")
+        } else {
+            Console.WriteLine("[FAIL] execbind: " + DuckDB.LastError(db))
+        }
+
+        if (DuckDB.IsOpen(db)) {
+            Console.WriteLine("[PASS] execbind injection foiled")
+        } else {
+            Console.WriteLine("[FAIL] execbind injection: handle closed")
+        }
+
+        let qParams: List<string> = new List<string>()
+        qParams.Add("Dave; DROP TABLE users; --")
+        let daveRows = DuckDB.QueryBindAll(db,
+            "SELECT name, age FROM users WHERE name = ?", qParams)
+        if (daveRows.Count() == 1) {
+            let daveRow = daveRows.Get(0)
+            let daveAge: string = daveRow.Get(1)
+            if (daveAge == "55") {
+                Console.WriteLine("[PASS] querybindall fetch")
+            } else {
+                Console.WriteLine("[FAIL] querybindall age got: " + daveAge)
+            }
+        } else {
+            Console.WriteLine("[FAIL] querybindall rows got " + String_FromInt(daveRows.Count()))
+        }
+
+        let arityBad: List<string> = new List<string>()
+        arityBad.Add("alone")
+        let arityOk: bool = DuckDB.ExecBind(db,
+            "INSERT INTO users VALUES (?, ?, ?)", arityBad)
+        if (!arityOk) {
+            let arityErr: string = DuckDB.LastError(db)
+            if (String_Contains(arityErr, "param count mismatch")) {
+                Console.WriteLine("[PASS] execbind arity check")
+            } else {
+                Console.WriteLine("[FAIL] execbind arity err: " + arityErr)
+            }
+        } else {
+            Console.WriteLine("[FAIL] execbind arity: should have rejected")
+        }
+
+        // ── v0.3: transactions (Begin / Commit / Rollback) ────
+
+        let beginOk: bool = DuckDB.Begin(db)
+        if (beginOk) {
+            Console.WriteLine("[PASS] begin")
+        } else {
+            Console.WriteLine("[FAIL] begin: " + DuckDB.LastError(db))
+        }
+
+        DuckDB.Exec(db, "INSERT INTO users VALUES (99, 'Eve', 99)")
+        let rollbackOk: bool = DuckDB.Rollback(db)
+        if (rollbackOk) {
+            Console.WriteLine("[PASS] rollback")
+        } else {
+            Console.WriteLine("[FAIL] rollback: " + DuckDB.LastError(db))
+        }
+        let eveParams: List<string> = new List<string>()
+        eveParams.Add("Eve")
+        let eveRows = DuckDB.QueryBindAll(db,
+            "SELECT name FROM users WHERE name = ?", eveParams)
+        if (eveRows.Count() == 0) {
+            Console.WriteLine("[PASS] rollback drops insert")
+        } else {
+            Console.WriteLine("[FAIL] rollback left " + String_FromInt(eveRows.Count()) + " eve rows")
+        }
+
+        DuckDB.Begin(db)
+        DuckDB.Exec(db, "INSERT INTO users VALUES (100, 'Frank', 33)")
+        let commitOk: bool = DuckDB.Commit(db)
+        if (commitOk) {
+            Console.WriteLine("[PASS] commit")
+        } else {
+            Console.WriteLine("[FAIL] commit: " + DuckDB.LastError(db))
+        }
+        let frankParams: List<string> = new List<string>()
+        frankParams.Add("Frank")
+        let frankRows = DuckDB.QueryBindAll(db,
+            "SELECT age FROM users WHERE name = ?", frankParams)
+        if (frankRows.Count() == 1) {
+            Console.WriteLine("[PASS] commit persists insert")
+        } else {
+            Console.WriteLine("[FAIL] commit lost insert: " + String_FromInt(frankRows.Count()))
+        }
+
         // ── Close ─────────────────────────────────────────
 
         DuckDB.Close(db)

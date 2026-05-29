@@ -95,6 +95,27 @@ amc test                  # auto-resolves the dep, links the amalgamation
 | `DuckDB.LastError(db)`          | `string`          | Last error message (empty if none). |
 | `DuckDB.Exec(db, sql)`          | `bool`            | Runs a no-result statement. Returns success. |
 | `DuckDB.QueryAll(db, sql)`      | `List<List<string>>` | Runs a SELECT; every value materialised as text. |
+| `DuckDB.ExecBind(db, sql, params)` | `bool`         | `?` placeholders bound from `List<string>` (v0.3+). |
+| `DuckDB.QueryBindAll(db, sql, params)` | `List<List<string>>` | Parameterised SELECT (v0.3+). |
+| `DuckDB.Begin(db)`              | `bool`            | Start transaction (v0.3+). |
+| `DuckDB.Commit(db)`             | `bool`            | Commit transaction (v0.3+). |
+| `DuckDB.Rollback(db)`           | `bool`            | Roll back transaction (v0.3+). |
+
+### Parameter binding (v0.3+)
+
+```amalgame
+let params: List<string> = new List<string>()
+params.Add("1")
+params.Add("Alice")
+params.Add("30")
+DuckDB.ExecBind(db, "INSERT INTO users VALUES (?, ?, ?)", params)
+```
+
+Positional `?` placeholders (1-indexed in SQL, 0-indexed in the
+list). Every value goes through `duckdb_bind_varchar`; DuckDB's
+type coercion converts to the destination column type. Arity
+mismatches surface as `"param count mismatch: got X, sql expects Y"`
+in `LastError`.
 
 ## Why DuckDB?
 
@@ -113,10 +134,10 @@ For OLTP / row-by-row writes, prefer `amalgame-database-sqlite`.
 
 ## Roadmap
 
-- Prepared statements via `?` placeholders
 - Typed column accessors (`AsInt(row, col)`, `AsDouble`, etc.)
 - Parquet ingest helpers (`DuckDB.LoadParquet(path)`)
-- Transactions (`BEGIN`/`COMMIT`/`ROLLBACK`) as first-class methods
+- Type-safe param binding (vs the v0.3 `List<string>` shape)
+- BLOB / `?N` named placeholders
 - Result-streaming for queries that don't fit in memory
 
 ## Licence

@@ -168,4 +168,129 @@ static inline AmalgameList* Amalgame_Database_DuckDB_QueryAll(AmalgameDuckDB* d,
     return rows;
 }
 
+/* ────────────────────────────────────────────────────────────────
+ * v0.3 surface — parameter binding + transactions.
+ *
+ * Parameter binding uses positional `?` placeholders (1-indexed in
+ * SQL, 0-indexed in the Amalgame list — mirrors the SQLite sibling).
+ * Every binding goes through `duckdb_bind_varchar`; DuckDB's type
+ * coercion converts the text to INTEGER / DOUBLE / DATE / TIMESTAMP
+ * per the destination column's declared type. NULL list entries
+ * bind as SQL NULL.
+ *
+ * Transactions are wrappers around BEGIN TRANSACTION / COMMIT /
+ * ROLLBACK through the existing Exec path so error reporting stays
+ * uniform with the rest of the surface.
+ * ──────────────────────────────────────────────────────────────── */
+
+/* Shared bind step: prepare + bind every param. Returns the
+ * prepared-statement handle on success, NULL on failure (with
+ * d->last_error populated). Caller owns destroying the handle. */
+static inline duckdb_prepared_statement Amalgame_DuckDB_prepare_bound(
+    AmalgameDuckDB* d, code_string sql, AmalgameList* params)
+{
+    duckdb_prepared_statement prep = NULL;
+    if (duckdb_prepare(d->con, sql ? sql : "", &prep) != DuckDBSuccess) {
+        const char* err = prep ? duckdb_prepare_error(prep) : NULL;
+        d->last_error = Amalgame_DuckDB_strdup_err(err ? err : "duckdb_prepare failed");
+        if (prep) duckdb_destroy_prepare(&prep);
+        return NULL;
+    }
+    int n = params ? (int) AmalgameList_size(params) : 0;
+    idx_t wanted = duckdb_nparams(prep);
+    if ((idx_t) n != wanted) {
+        char buf[128];
+        snprintf(buf, sizeof(buf),
+            "param count mismatch: got %d, sql expects %llu",
+            n, (unsigned long long) wanted);
+        d->last_error = Amalgame_DuckDB_strdup_err(buf);
+        duckdb_destroy_prepare(&prep);
+        return NULL;
+    }
+    for (int i = 0; i < n; i++) {
+        code_string v = (code_string) AmalgameList_get(params, i);
+        duckdb_state br;
+        if (v) {
+            br = duckdb_bind_varchar(prep, (idx_t)(i + 1), v);
+        } else {
+            br = duckdb_bind_null(prep, (idx_t)(i + 1));
+        }
+        if (br != DuckDBSuccess) {
+            const char* err = duckdb_prepare_error(prep);
+            d->last_error = Amalgame_DuckDB_strdup_err(err ? err : "duckdb_bind failed");
+            duckdb_destroy_prepare(&prep);
+            return NULL;
+        }
+    }
+    return prep;
+}
+
+static inline code_bool Amalgame_Database_DuckDB_ExecBind(
+    AmalgameDuckDB* d, code_string sql, AmalgameList* params)
+{
+    if (!d || !d->is_open) return 0;
+    duckdb_prepared_statement prep = Amalgame_DuckDB_prepare_bound(d, sql, params);
+    if (!prep) return 0;
+    duckdb_result r;
+    duckdb_state st = duckdb_execute_prepared(prep, &r);
+    if (st != DuckDBSuccess) {
+        const char* err = duckdb_result_error(&r);
+        d->last_error = Amalgame_DuckDB_strdup_err(err ? err : "duckdb_execute_prepared failed");
+        duckdb_destroy_result(&r);
+        duckdb_destroy_prepare(&prep);
+        return 0;
+    }
+    duckdb_destroy_result(&r);
+    duckdb_destroy_prepare(&prep);
+    return 1;
+}
+
+static inline AmalgameList* Amalgame_Database_DuckDB_QueryBindAll(
+    AmalgameDuckDB* d, code_string sql, AmalgameList* params)
+{
+    AmalgameList* rows = AmalgameList_new();
+    if (!d || !d->is_open) return rows;
+    duckdb_prepared_statement prep = Amalgame_DuckDB_prepare_bound(d, sql, params);
+    if (!prep) return rows;
+    duckdb_result r;
+    duckdb_state st = duckdb_execute_prepared(prep, &r);
+    if (st != DuckDBSuccess) {
+        const char* err = duckdb_result_error(&r);
+        d->last_error = Amalgame_DuckDB_strdup_err(err ? err : "duckdb_execute_prepared failed");
+        duckdb_destroy_result(&r);
+        duckdb_destroy_prepare(&prep);
+        return rows;
+    }
+    idx_t nRows = duckdb_row_count(&r);
+    idx_t nCols = duckdb_column_count(&r);
+    for (idx_t i = 0; i < nRows; i++) {
+        AmalgameList* row = AmalgameList_new();
+        for (idx_t j = 0; j < nCols; j++) {
+            char* val = duckdb_value_varchar(&r, j, i);
+            const char* s = val ? val : "";
+            size_t n = strlen(s);
+            char* copy = (char*) code_alloc(n + 1);
+            memcpy(copy, s, n + 1);
+            AmalgameList_add(row, (void*) copy);
+            if (val) duckdb_free(val);
+        }
+        AmalgameList_add(rows, (void*) row);
+    }
+    duckdb_destroy_result(&r);
+    duckdb_destroy_prepare(&prep);
+    return rows;
+}
+
+static inline code_bool Amalgame_Database_DuckDB_Begin(AmalgameDuckDB* d) {
+    return Amalgame_Database_DuckDB_Exec(d, "BEGIN TRANSACTION");
+}
+
+static inline code_bool Amalgame_Database_DuckDB_Commit(AmalgameDuckDB* d) {
+    return Amalgame_Database_DuckDB_Exec(d, "COMMIT");
+}
+
+static inline code_bool Amalgame_Database_DuckDB_Rollback(AmalgameDuckDB* d) {
+    return Amalgame_Database_DuckDB_Exec(d, "ROLLBACK");
+}
+
 #endif /* AMALGAME_DATABASE_DUCKDB_H */
